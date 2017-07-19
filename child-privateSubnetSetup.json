@@ -1,0 +1,242 @@
+{"AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "[Child]This CloudFormation template is used to set up the private subnets and route tables used by the parent VPC.",
+  "Parameters" : {
+    "Environment" : {
+      "Description" : "Name of the environment",
+      "Type" : "String",
+      "Default" : "devjenkins"
+    },
+    "VPCId" : {
+      "Description" : "The ID of the VPC",
+      "Type" : "String"
+    },
+    "SubnetPrivateACidrBlock" : {
+      "Description" : "IP address CIDR range assigned to the private A subnet - not required",
+      "Type" : "String",
+      "MinLength" : "9",
+      "MaxLength" : "18",
+      "AllowedPattern" : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription" : "Must be a valid CIDR range of the form x.x.x.x/x"
+    },
+    "SubnetPrivateBCidrBlock" : {
+      "Description" : "IP address CIDR range assigned to the private B subnet - not required",
+      "Type" : "String",
+      "MinLength" : "9",
+      "MaxLength" : "18",
+      "AllowedPattern" : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription" : "Must be a valid CIDR range of the form x.x.x.x/x"
+    },
+    "NatGatewayId" : {
+      "Description" : "ID of an NAT Gateway to allow outbound communication with the internet.",
+      "Type" : "String"
+    }
+  },
+  "Mappings" : {
+    "RegionToAZ" : {
+      "us-east-1" : {
+        "AvailabilityZone1" : "us-east-1a",
+        "AvailabilityZone2" : "us-east-1b"
+      },
+      "us-west-1" : {
+        "AvailabilityZone1" : "us-west-1a",
+        "AvailabilityZone2" : "us-west-1b"
+      },
+      "us-west-2" : {
+        "AvailabilityZone1" : "us-west-2a",
+        "AvailabilityZone2" : "us-west-2b"
+      },
+      "eu-west-1" : {
+        "AvailabilityZone1" : "eu-west-1a",
+        "AvailabilityZone2" : "eu-west-1b"
+      },
+      "eu-central-1" : {
+        "AvailabilityZone1" : "eu-central-1a",
+        "AvailabilityZone2" : "eu-central-1b"
+      }
+    }
+  },
+  "Conditions" : {
+  },
+  "Resources" : {
+    "SubnetPrivateA" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "CidrBlock" : {
+          "Ref" : "SubnetPrivateACidrBlock"
+        },
+        "VpcId" : {
+          "Ref" : "VPCId"
+        },
+        "AvailabilityZone" : {
+          "Fn::FindInMap" : [ "RegionToAZ", {
+            "Ref" : "AWS::Region"
+          }, "AvailabilityZone1" ]
+        },
+        "Tags" : [ {
+          "Key" : "Name",
+          "Value" : {
+            "Fn::Join" : [ "-", [ {
+              "Ref" : "Environment"
+            }, "SubnetPrivateA" ] ]
+          }
+        } ]
+      }
+    },
+    "SubnetPrivateB" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "CidrBlock" : {
+          "Ref" : "SubnetPrivateBCidrBlock"
+        },
+        "VpcId" : {
+          "Ref" : "VPCId"
+        },
+        "AvailabilityZone" : {
+          "Fn::FindInMap" : [ "RegionToAZ", {
+            "Ref" : "AWS::Region"
+          }, "AvailabilityZone2" ]
+        },
+        "Tags" : [ {
+          "Key" : "Name",
+          "Value" : {
+            "Fn::Join" : [ "-", [ {
+              "Ref" : "Environment"
+            }, "SubnetPrivateB" ] ]
+          }
+        } ]
+      }
+    },
+    "RoutePrivateA" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "NatGatewayId" : {
+          "Ref" : "NatGatewayId"
+        },
+        "RouteTableId" : {
+          "Ref" : "RouteTablePrivateA"
+        }
+      }
+    },
+    "RoutePrivateB" : {
+      "Type" : "AWS::EC2::Route",
+      "Properties" : {
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "NatGatewayId" : {
+          "Ref" : "NatGatewayId"
+        },
+        "RouteTableId" : {
+          "Ref" : "RouteTablePrivateB"
+        }
+      }
+    },
+    "RouteTablePrivateA" : {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : {
+          "Ref" : "VPCId"
+        },
+        "Tags" : [ {
+          "Key" : "Name",
+          "Value" : {
+            "Fn::Join" : [ "-", [ {
+              "Ref" : "Environment"
+            }, "RouteTablePrivate", {
+              "Ref" : "AWS::Region"
+            } ] ]
+          }
+        } ]
+      }
+    },
+    "RouteTablePrivateB" : {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : {
+          "Ref" : "VPCId"
+        },
+        "Tags" : [ {
+          "Key" : "Name",
+          "Value" : {
+            "Fn::Join" : [ "-", [ {
+              "Ref" : "Environment"
+            }, "RouteTablePrivate", {
+              "Ref" : "AWS::Region"
+            } ] ]
+          }
+        } ]
+      }
+    },
+    "RouteTableAssociationToSubnetPrivateA" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "RouteTableId" : {
+          "Ref" : "RouteTablePrivateA"
+        },
+        "SubnetId" : {
+          "Ref" : "SubnetPrivateA"
+        }
+      }
+    },
+    "RouteTableAssociationToSubnetPrivateB" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "RouteTableId" : {
+          "Ref" : "RouteTablePrivateB"
+        },
+        "SubnetId" : {
+          "Ref" : "SubnetPrivateB"
+        }
+      }
+    }
+  },
+  "Outputs" : {
+    "SubnetPrivateAId" : {
+      "Description" : " Private Subnet A Id",
+      "Value" : {
+        "Ref" : "SubnetPrivateA"
+      }
+    },
+    "SubnetPrivateAAvailabilityZone" : {
+      "Description" : "The Availability Zone  Private Subnet A resides in",
+      "Value" : {
+        "Fn::GetAtt" : [ "SubnetPrivateA", "AvailabilityZone" ]
+      }
+    },
+    "SubnetPrivateACidr" : {
+      "Description" : "The  Private Subnet A's IP CIDR allocation",
+      "Value" : {
+        "Ref" : "SubnetPrivateACidrBlock"
+      }
+    },
+    "SubnetPrivateBId" : {
+      "Description" : " Private Subnet B Id",
+      "Value" : {
+        "Ref" : "SubnetPrivateB"
+      }
+    },
+    "SubnetPrivateBAvailabilityZone" : {
+      "Description" : "The Availability Zone  Private Subnet B resides in",
+      "Value" : {
+        "Fn::GetAtt" : [ "SubnetPrivateB", "AvailabilityZone" ]
+      }
+    },
+    "SubnetPrivateBCidr" : {
+      "Description" : "The  Private Subnet B's IP CIDR allocation",
+      "Value" : {
+        "Ref" : "SubnetPrivateBCidrBlock"
+      }
+    },
+    "RouteTablePrivateAId" : {
+      "Description" : "Private Route Table Id",
+      "Value" : {
+        "Ref" : "RouteTablePrivateA"
+      }
+    },
+    "RouteTablePrivateBId" : {
+      "Description" : "Private Route Table Id",
+      "Value" : {
+        "Ref" : "RouteTablePrivateB"
+      }
+    }
+  }
+}
